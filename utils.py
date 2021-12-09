@@ -55,11 +55,13 @@ def torch_gather4d(input_tensor, indexes):
     input_tensor = torch.unsqueeze(input_tensor, 1)
     input_tensor = torch.unsqueeze(input_tensor, 1)
     input_tensor = torch.unsqueeze(input_tensor, 1)
-    input_tensor = input_tensor.expand(-1, indexes.size(1), indexes.size(2), indexes.size(3), -1, -1)
+    input_tensor = input_tensor.expand(-1, indexes.size(1), indexes.size(2),
+                                       indexes.size(3), -1, -1)
 
     output_tensor = torch.gather(input_tensor, 4, indexes)
-    output_tensor = output_tensor.view(
-        (indexes.size(0), indexes.size(1), indexes.size(2), indexes.size(3), input_tensor.size(-1)))
+    output_tensor = output_tensor.view((indexes.size(0), indexes.size(1),
+                                        indexes.size(2), indexes.size(3),
+                                        input_tensor.size(-1)))
 
     return output_tensor
 
@@ -71,7 +73,8 @@ def torch_gather5d(input_tensor, indexes):
     indexes = indexes.long()
     indexes = torch.unsqueeze(indexes, -1)
     indexes = torch.unsqueeze(indexes, -1)
-    indexes = indexes.expand(-1, -1, -1, -1, input_tensor.size(-2), input_tensor.size(-1))
+    indexes = indexes.expand(-1, -1, -1, -1, input_tensor.size(-2),
+                             input_tensor.size(-1))
 
     input_tensor = torch.unsqueeze(input_tensor, 2)
     input_tensor = input_tensor.expand(-1, -1, indexes.size(2), -1, -1, -1)
