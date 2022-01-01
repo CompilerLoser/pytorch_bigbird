@@ -455,7 +455,6 @@ class BigbirdBlockSpareAttention(nn.Module):
           float Tensor of shape [batch_size, from_seq_length, num_attention_heads,
             size_per_head].
         """
-
         assert from_seq_length // self.from_block_size == to_seq_length // self.to_block_size
 
         # cast masks to float
@@ -529,16 +528,18 @@ class BigbirdBlockSpareAttention(nn.Module):
         gathered_value = utils.torch_gather5d(
             blocked_value_matrix, rand_attn).view((b, h, m // wm - 2, r * wn,
                                                    -1))
+        # first row
         first_product = torch.einsum(
             "bhqd,bhkd->bhqk", blocked_query_matrix[:, :, 0],
             key_layer)  # [b, h, wm, -1] x [b, h, n, -1] ==> [b, h, wm, n]
         first_product = torch.mul(first_product, 1.0 / np.sqrt(d))
-        first_product += (1.0 - to_mask) * -10000.0
+        first_product += (1.0 - to_mask) * -10000.0 # to_mask [b, 1, 1, n]
         first_attn_weights = F.softmax(first_product, -1)  # [b, h, wm, n]
         first_context_layer = torch.einsum(
             "bhqk,bhkd->bhqd", first_attn_weights,
             value_layer)  # [b, h, wm, n] x [b, h, n, -1] ==> [b, h, wm, -1]
         first_context_layer = torch.unsqueeze(first_context_layer, 2)
+        # second row
         second_key_mat = torch.cat(
             (blocked_key_matrix[:, :, 0], blocked_key_matrix[:, :, 1],
              blocked_key_matrix[:, :, 2], blocked_key_matrix[:, :, -1],
@@ -549,7 +550,7 @@ class BigbirdBlockSpareAttention(nn.Module):
              gathered_value[:, :, 0]), 2)  # [b, h, (4+r)*wn, -1]
         second_product = torch.einsum(
             "bhqd,bhkd->bhqk", blocked_query_matrix[:, :, 1], second_key_mat)
-        second_seq_pad = torch.cat(
+        second_seq_pad = torch.cat(# what is this?
             (to_mask[:, :, :, :3 * wn], to_mask[:, :, :, -wn:],
              torch.ones(b, 1, 1, r * wn).long()), 3)
         second_rand_pad = torch.cat(
@@ -561,25 +562,30 @@ class BigbirdBlockSpareAttention(nn.Module):
         second_context_layer = torch.einsum(
             "bhqk,bhkd->bhqd", second_attn_weights, second_value_mat)
         second_context_layer = torch.unsqueeze(second_context_layer, 2)
+        # [2:-2] row
         exp_blocked_key_matrix = torch.cat(
             (blocked_key_matrix[:, :, 1:-3], blocked_key_matrix[:, :, 2:-2],
-             blocked_key_matrix[:, :, 3:-1]), 3)  # [b, h, m//wm-4, 3*wn, -1]
+             blocked_key_matrix[:, :, 3:-1]), 3)  # [b, h, m//wm-4, 3*wn, -1] Roll Keys
         exp_blocked_value_matrix = torch.cat(
             (blocked_value_matrix[:, :, 1:-3],
              blocked_value_matrix[:, :, 2:-2],
              blocked_value_matrix[:, :, 3:-1]), 3)  # [b, h, m//wm-4, 3*wn, -1]
         middle_query_matrix = blocked_query_matrix[:, :, 2:-2]
+        # slide winow band
         inner_band_product = torch.einsum(
             "bhlqd,bhlkd->bhlqk", middle_query_matrix, exp_blocked_key_matrix)
         inner_band_product = torch.mul(inner_band_product, 1.0 / np.sqrt(d))
+        # random band
         rand_band_product = torch.einsum("bhlqd,bhlkd->bhlqk",
                                          middle_query_matrix,
                                          gathered_key[:, :, 1:-1])
         rand_band_product = torch.mul(rand_band_product, 1.0 / np.sqrt(d))
+        # global fisrt col 
         first_band_product = torch.einsum("bhlqd,bhkd->bhlqk",
                                           middle_query_matrix,
                                           blocked_key_matrix[:, :, 0])
         first_band_product = torch.mul(first_band_product, 1.0 / np.sqrt(d))
+        # global last band  
         last_band_product = torch.einsum("bhlqd,bhkd->bhlqk",
                                          middle_query_matrix,
                                          blocked_key_matrix[:, :, -1])
@@ -605,6 +611,7 @@ class BigbirdBlockSpareAttention(nn.Module):
         context_layer += torch.einsum("bhlqk,bhkd->bhlqd",
                                       attn_weights[:, :, :, :, -wn:],
                                       blocked_value_matrix[:, :, -1])
+        # -2 row
         second_last_key_mat = torch.cat(
             (blocked_key_matrix[:, :, 0], blocked_key_matrix[:, :, -3],
              blocked_key_matrix[:, :, -2], blocked_key_matrix[:, :, -1],
@@ -629,6 +636,7 @@ class BigbirdBlockSpareAttention(nn.Module):
             "bhqk,bhkd->bhqd", second_last_attn_weights, second_last_value_mat)
         second_last_context_layer = torch.unsqueeze(second_last_context_layer,
                                                     2)
+        # -1 row
         last_product = torch.einsum("bhqd,bhkd->bhqk",
                                     blocked_query_matrix[:, :, -1], key_layer)
         last_product = torch.mul(last_product, 1.0 / np.sqrt(d))
@@ -642,5 +650,4 @@ class BigbirdBlockSpareAttention(nn.Module):
              second_last_context_layer, last_context_layer), 2)
         context_layer = context_layer.view((b, h, m, -1)) * from_mask
         context_layer = context_layer.permute(0, 2, 1, 3)
-
         return context_layer

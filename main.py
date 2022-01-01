@@ -2,8 +2,9 @@ import pdb
 
 from attention import BigbirdBlockSpareAttention
 import torch
+import time
 
-batch_size = 16
+batch_size = 256
 
 num_attention_heads = 1
 size_per_head = 512
@@ -35,13 +36,17 @@ rand_attn = torch.rand(num_attention_heads,
                        from_seq_length // from_block_size - 2, num_rand_blocks)
 
 if __name__ == '__main__':
+    start = time.perf_counter()
     attn = BigbirdBlockSpareAttention(
         num_attention_heads=num_attention_heads,
         num_rand_blocks=num_rand_blocks,
         size_per_head=size_per_head,
         from_block_size=from_block_size,
         to_block_size=to_block_size)
-
+    
     attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask,
          from_blocked_mask, to_blocked_mask, batch_size, from_seq_length,
          to_seq_length)
+    end = time.perf_counter()
+    print('total time')
+    print((end - start))
