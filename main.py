@@ -4,7 +4,7 @@ from attention import BigbirdBlockSpareAttention
 import torch
 import time
 
-batch_size = 256
+batch_size = 16
 
 num_attention_heads = 1
 size_per_head = 512
@@ -48,5 +48,5 @@ if __name__ == '__main__':
          from_blocked_mask, to_blocked_mask, batch_size, from_seq_length,
          to_seq_length)
     end = time.perf_counter()
-    print('total time')
-    print((end - start))
+    print('throutput')
+    print(batch_size*num_attention_heads*from_seq_length/(end - start))
