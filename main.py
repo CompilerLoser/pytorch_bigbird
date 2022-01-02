@@ -1,6 +1,7 @@
 import pdb
 
 from attention import BigbirdBlockSpareAttention
+from attention_simulated import BigbirdBlockSpareAttention_sim
 import torch
 import time
 
@@ -9,8 +10,8 @@ batch_size = 16
 num_attention_heads = 1
 size_per_head = 512
 num_rand_blocks = 3
-from_seq_length = 1024
-to_seq_length = 1024
+from_seq_length = 4096
+to_seq_length = 4096
 from_block_size = 64
 to_block_size = 64
 
@@ -44,9 +45,14 @@ if __name__ == '__main__':
         from_block_size=from_block_size,
         to_block_size=to_block_size)
     
-    attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask,
-         from_blocked_mask, to_blocked_mask, batch_size, from_seq_length,
-         to_seq_length)
+    attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask, from_blocked_mask, to_blocked_mask, batch_size, from_seq_length, to_seq_length)
+    attn_sim = BigbirdBlockSpareAttention_sim(
+        num_attention_heads=num_attention_heads,
+        num_rand_blocks=num_rand_blocks,
+        size_per_head=size_per_head,
+        from_block_size=from_block_size,
+        to_block_size=to_block_size)
+    # attn_sim(query_layer, key_layer, value_layer, batch_size, from_seq_length, to_seq_length)
     end = time.perf_counter()
     print('throutput')
     print(batch_size*num_attention_heads*from_seq_length/(end - start))
