@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
+import time
 
 import utils
 
@@ -448,7 +449,7 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
  
        # Since we are adding it to the raw scores before the softmax, this is
        # effectively the same as removing these entirely.
-       attention_scores += adder
+       attention_scores += adder.cuda()
  
      # Normalize the attention scores to probabilities.
      # `attention_probs` = [B, N, F, T]
@@ -519,11 +520,11 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
             size_per_head].
         """
         assert from_seq_length // self.from_block_size == to_seq_length // self.to_block_size
-
+        perpare_data_start = time.perf_counter()
 
         # generate random attention and corresponding masks
         np.random.seed(self.seed)
-        if from_seq_length in [1024, 3072, 4096]:  # old plans used in paper
+        if from_seq_length in [1024, 2048, 3072, 4096]:  # old plans used in paper
             rand_attn = [
                 bigbird_block_rand_mask(  # pylint: disable=g-complex-comprehension
                     MAX_SEQ_LEN,
@@ -545,6 +546,10 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
         rand_block_mask = torch.unsqueeze(rand_block_mask, 0)  # [1, N, F, T]
 
         attention_mask = rand_block_mask
-        return self.original_full_attention(
+        compute_start = time.perf_counter()
+        res =  self.original_full_attention(
             query_layer, key_layer, value_layer, [attention_mask]
             )
+        compute_end = time.perf_counter()
+        print((compute_start - perpare_data_start)/(compute_end - perpare_data_start))
+        return res

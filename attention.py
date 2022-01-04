@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
-
+import time
 import utils
 
 MAX_SEQ_LEN = 4096
@@ -456,7 +456,7 @@ class BigbirdBlockSpareAttention(nn.Module):
             size_per_head].
         """
         assert from_seq_length // self.from_block_size == to_seq_length // self.to_block_size
-
+        perpare_data_start = time.perf_counter()
         # cast masks to float
         from_mask = from_mask.float()
         to_mask = to_mask.float()
@@ -466,7 +466,7 @@ class BigbirdBlockSpareAttention(nn.Module):
 
         # generate random attention and corresponding masks
         np.random.seed(self.seed)
-        if from_seq_length in [1024, 3072, 4096]:  # old plans used in paper
+        if from_seq_length in [1024,2048,  3072, 4096]:  # old plans used in paper
             rand_attn = [
                 bigbird_block_rand_mask(  # pylint: disable=g-complex-comprehension
                     MAX_SEQ_LEN,
@@ -494,9 +494,10 @@ class BigbirdBlockSpareAttention(nn.Module):
                 plan_num_rand_blocks=plan_num_rand_blocks)
 
         rand_attn = np.stack(rand_attn, axis=0)
-        rand_attn = torch.from_numpy(rand_attn).long()
+        rand_attn = torch.from_numpy(rand_attn).long().cuda()
         rand_attn = torch.unsqueeze(rand_attn, 0)
         rand_attn = torch.repeat_interleave(rand_attn, batch_size, 0)
+        print(rand_attn.device)
 
         rand_mask = create_rand_mask_from_inputs(
             from_blocked_mask,
@@ -528,6 +529,7 @@ class BigbirdBlockSpareAttention(nn.Module):
         gathered_value = utils.torch_gather5d(
             blocked_value_matrix, rand_attn).view((b, h, m // wm - 2, r * wn,
                                                    -1))
+        compute_start = time.perf_counter()
         # first row
         first_product = torch.einsum(
             "bhqd,bhkd->bhqk", blocked_query_matrix[:, :, 0],
@@ -552,9 +554,9 @@ class BigbirdBlockSpareAttention(nn.Module):
             "bhqd,bhkd->bhqk", blocked_query_matrix[:, :, 1], second_key_mat)
         second_seq_pad = torch.cat(# what is this?
             (to_mask[:, :, :, :3 * wn], to_mask[:, :, :, -wn:],
-             torch.ones(b, 1, 1, r * wn).long()), 3)
+             torch.ones(b, 1, 1, r * wn).long().cuda()), 3)
         second_rand_pad = torch.cat(
-            (torch.ones(b, h, wm, 4 * wn).long(), rand_mask[:, :, 0]), 3)
+            (torch.ones(b, h, wm, 4 * wn).long().cuda(), rand_mask[:, :, 0]), 3)
         second_product = torch.mul(second_product, 1.0 / np.sqrt(d))
         second_product += (
             1.0 - torch.minimum(second_seq_pad, second_rand_pad)) * -10000.0
@@ -625,9 +627,9 @@ class BigbirdBlockSpareAttention(nn.Module):
                                            second_last_key_mat)
         second_last_seq_pad = torch.cat(
             (to_mask[:, :, :, :wn], to_mask[:, :, :, -3 * wn:],
-             torch.ones(b, 1, 1, r * wn).long()), 3)
+             torch.ones(b, 1, 1, r * wn).long().cuda()), 3)
         second_last_rand_pad = torch.cat(
-            (torch.ones(b, h, wm, 4 * wn).long(), rand_mask[:, :, -1]), 3)
+            (torch.ones(b, h, wm, 4 * wn).long().cuda(), rand_mask[:, :, -1]), 3)
         second_last_product = torch.mul(second_last_product, 1.0 / np.sqrt(d))
         second_last_product += (1.0 - torch.minimum(
             second_last_seq_pad, second_last_rand_pad)) * -10000.0
@@ -650,4 +652,8 @@ class BigbirdBlockSpareAttention(nn.Module):
              second_last_context_layer, last_context_layer), 2)
         context_layer = context_layer.view((b, h, m, -1)) * from_mask
         context_layer = context_layer.permute(0, 2, 1, 3)
+        compute_end = time.perf_counter()
+        print((compute_start - perpare_data_start)/(compute_end - perpare_data_start))
+       
+        
         return context_layer
