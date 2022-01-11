@@ -497,7 +497,7 @@ class BigbirdBlockSpareAttention(nn.Module):
         rand_attn = torch.from_numpy(rand_attn).long().cuda()
         rand_attn = torch.unsqueeze(rand_attn, 0)
         rand_attn = torch.repeat_interleave(rand_attn, batch_size, 0)
-        print(rand_attn.device)
+        
 
         rand_mask = create_rand_mask_from_inputs(
             from_blocked_mask,

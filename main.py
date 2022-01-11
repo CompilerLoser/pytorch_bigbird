@@ -4,8 +4,9 @@ from attention import BigbirdBlockSpareAttention
 from attention_simulated import BigbirdBlockSpareAttention_sim
 import torch
 import time
+import os
 
-batch_size = 16
+batch_size = 32
 
 num_attention_heads = 1
 size_per_head = 512
@@ -15,8 +16,8 @@ to_seq_length = 4096
 from_block_size = 64
 to_block_size = 64
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-torch.cuda.set_device(2)
 
 
 query_layer = torch.rand(batch_size, num_attention_heads, from_seq_length,
@@ -29,6 +30,8 @@ print(query_layer.device)
 # The values should be 1 or 0. The attention scores will effectively be
 # set to -infinity for any positions in the mask that are 0, and will be
 # unchanged for positions that are 1.
+
+start = time.perf_counter()
 band_mask = torch.rand(batch_size, 1, from_seq_length // from_block_size - 4,
                        from_block_size, 3 * to_block_size).cuda()
 from_mask = torch.rand(batch_size, 1, from_seq_length, 1).cuda()
@@ -40,24 +43,22 @@ to_blocked_mask = torch.rand(batch_size, to_seq_length // to_block_size,
 rand_attn = torch.rand(num_attention_heads,
                        from_seq_length // from_block_size - 2, num_rand_blocks).cuda()
 
-if __name__ == '__main__':
-    start = time.perf_counter()
-    attn = BigbirdBlockSpareAttention(
-        num_attention_heads=num_attention_heads,
-        num_rand_blocks=num_rand_blocks,
-        size_per_head=size_per_head,
-        from_block_size=from_block_size,
-        to_block_size=to_block_size).cuda()
-    
-    attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask, from_blocked_mask, to_blocked_mask, batch_size, from_seq_length, to_seq_length)
-    attn_sim = BigbirdBlockSpareAttention_sim(
-        num_attention_heads=num_attention_heads,
-        num_rand_blocks=num_rand_blocks,
-        size_per_head=size_per_head,
-        from_block_size=from_block_size,
-        to_block_size=to_block_size).cuda()
-    #attn_sim(query_layer, key_layer, value_layer, batch_size, from_seq_length, to_seq_length)
-    end = time.perf_counter()
-    
-    print('throutput')
-    print(batch_size*num_attention_heads*from_seq_length/(end - start))
+attn = BigbirdBlockSpareAttention(
+    num_attention_heads=num_attention_heads,
+    num_rand_blocks=num_rand_blocks,
+    size_per_head=size_per_head,
+    from_block_size=from_block_size,
+    to_block_size=to_block_size).cuda()
+
+attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask, from_blocked_mask, to_blocked_mask, batch_size, from_seq_length, to_seq_length)
+attn_sim = BigbirdBlockSpareAttention_sim(
+    num_attention_heads=num_attention_heads,
+    num_rand_blocks=num_rand_blocks,
+    size_per_head=size_per_head,
+    from_block_size=from_block_size,
+    to_block_size=to_block_size).cuda()
+#attn_sim(query_layer, key_layer, value_layer, batch_size, from_seq_length, to_seq_length)
+end = time.perf_counter()
+
+print('throutput')
+print(batch_size*num_attention_heads*from_seq_length/(end - start))
