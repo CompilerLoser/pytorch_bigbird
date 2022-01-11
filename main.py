@@ -6,27 +6,26 @@ import torch
 import time
 import os
 
-batch_size = 32
+batch_size = 16
 
-num_attention_heads = 1
+num_attention_heads = 4
 size_per_head = 512
 num_rand_blocks = 3
 from_seq_length = 4096  
 to_seq_length = 4096
-from_block_size = 64
-to_block_size = 64
+from_block_size = 32
+to_block_size = 32
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 query_layer = torch.rand(batch_size, num_attention_heads, from_seq_length,
-                         size_per_head).cuda()
+                         size_per_head).half().cuda()
 key_layer = torch.rand(batch_size, num_attention_heads, to_seq_length,
-                       size_per_head).cuda()
+                       size_per_head).half().cuda()
 value_layer = torch.rand(batch_size, num_attention_heads, to_seq_length,
-                         size_per_head).cuda()
-print(query_layer.device)
+                         size_per_head).half().cuda()
 # The values should be 1 or 0. The attention scores will effectively be
 # set to -infinity for any positions in the mask that are 0, and will be
 # unchanged for positions that are 1.
@@ -50,15 +49,20 @@ attn = BigbirdBlockSpareAttention(
     from_block_size=from_block_size,
     to_block_size=to_block_size).cuda()
 
-attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask, from_blocked_mask, to_blocked_mask, batch_size, from_seq_length, to_seq_length)
+res, compute_start = attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask, from_blocked_mask, to_blocked_mask, batch_size, from_seq_length, to_seq_length)
+'''
 attn_sim = BigbirdBlockSpareAttention_sim(
     num_attention_heads=num_attention_heads,
     num_rand_blocks=num_rand_blocks,
     size_per_head=size_per_head,
     from_block_size=from_block_size,
     to_block_size=to_block_size).cuda()
-#attn_sim(query_layer, key_layer, value_layer, batch_size, from_seq_length, to_seq_length)
+res, compute_start = attn_sim(query_layer, key_layer, value_layer, batch_size, from_seq_length, to_seq_length)
+'''
 end = time.perf_counter()
 
+print(end - start)
+print("%")
+print((end - compute_start)/ (end-start)*100)
 print('throutput')
-print(batch_size*num_attention_heads*from_seq_length/(end - start))
+print(batch_size*num_attention_heads*from_seq_length/(end - start)/1000)

@@ -652,8 +652,4 @@ class BigbirdBlockSpareAttention(nn.Module):
              second_last_context_layer, last_context_layer), 2)
         context_layer = context_layer.view((b, h, m, -1)) * from_mask
         context_layer = context_layer.permute(0, 2, 1, 3)
-        compute_end = time.perf_counter()
-        print((compute_start - perpare_data_start)/(compute_end - perpare_data_start))
-       
-        
-        return context_layer
+        return context_layer, compute_start###

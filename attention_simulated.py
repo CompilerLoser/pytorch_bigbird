@@ -550,6 +550,4 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
         res =  self.original_full_attention(
             query_layer, key_layer, value_layer, [attention_mask]
             )
-        compute_end = time.perf_counter()
-        print((compute_start - perpare_data_start)/(compute_end - perpare_data_start))
-        return res
+        return res, compute_start
