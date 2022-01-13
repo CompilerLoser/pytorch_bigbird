@@ -531,7 +531,7 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
                     self.from_block_size,
                     self.to_block_size,
                     self.num_rand_blocks,
-                    last_idx=1024)[:(
+                    last_idx=from_seq_length)[:(
                         from_seq_length // self.from_block_size - 2)]
                 for _ in range(self.num_attention_heads)
             ]

@@ -30,7 +30,6 @@ value_layer = torch.rand(batch_size, num_attention_heads, to_seq_length,
 # set to -infinity for any positions in the mask that are 0, and will be
 # unchanged for positions that are 1.
 
-start = time.perf_counter()
 band_mask = torch.rand(batch_size, 1, from_seq_length // from_block_size - 4,
                        from_block_size, 3 * to_block_size).cuda()
 from_mask = torch.rand(batch_size, 1, from_seq_length, 1).cuda()
@@ -42,6 +41,7 @@ to_blocked_mask = torch.rand(batch_size, to_seq_length // to_block_size,
 rand_attn = torch.rand(num_attention_heads,
                        from_seq_length // from_block_size - 2, num_rand_blocks).cuda()
 
+start = time.perf_counter()
 attn = BigbirdBlockSpareAttention(
     num_attention_heads=num_attention_heads,
     num_rand_blocks=num_rand_blocks,
