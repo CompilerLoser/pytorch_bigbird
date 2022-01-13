@@ -455,8 +455,8 @@ class BigbirdBlockSpareAttention(nn.Module):
           float Tensor of shape [batch_size, from_seq_length, num_attention_heads,
             size_per_head].
         """
+        __init_and_gen_random_location = time.perf_counter()
         assert from_seq_length // self.from_block_size == to_seq_length // self.to_block_size
-        perpare_data_start = time.perf_counter()
         # cast masks to float
         from_mask = from_mask.float()
         to_mask = to_mask.float()
@@ -497,8 +497,8 @@ class BigbirdBlockSpareAttention(nn.Module):
         rand_attn = torch.from_numpy(rand_attn).long().cuda()
         rand_attn = torch.unsqueeze(rand_attn, 0)
         rand_attn = torch.repeat_interleave(rand_attn, batch_size, 0)
-        
 
+        __gen_rand_mask = time.perf_counter()
         rand_mask = create_rand_mask_from_inputs(
             from_blocked_mask,
             to_blocked_mask,
@@ -509,7 +509,7 @@ class BigbirdBlockSpareAttention(nn.Module):
             from_seq_length,
             self.from_block_size,
         )
-
+        __gather_random_data = time.perf_counter()
         # Define shorthands
         h = self.num_attention_heads
         r = self.num_rand_blocks
@@ -529,6 +529,7 @@ class BigbirdBlockSpareAttention(nn.Module):
         gathered_value = utils.torch_gather5d(
             blocked_value_matrix, rand_attn).view((b, h, m // wm - 2, r * wn,
                                                    -1))
+        __first_row = time.perf_counter()
         # first row
         first_product = torch.einsum(
             "bhqd,bhkd->bhqk", blocked_query_matrix[:, :, 0],
@@ -541,6 +542,7 @@ class BigbirdBlockSpareAttention(nn.Module):
             value_layer)  # [b, h, wm, n] x [b, h, n, -1] ==> [b, h, wm, -1]
         first_context_layer = torch.unsqueeze(first_context_layer, 2)
         # second row
+        __second_row = time.perf_counter()
         second_key_mat = torch.cat(
             (blocked_key_matrix[:, :, 0], blocked_key_matrix[:, :, 1],
              blocked_key_matrix[:, :, 2], blocked_key_matrix[:, :, -1],
@@ -563,6 +565,7 @@ class BigbirdBlockSpareAttention(nn.Module):
         second_context_layer = torch.einsum(
             "bhqk,bhkd->bhqd", second_attn_weights, second_value_mat)
         second_context_layer = torch.unsqueeze(second_context_layer, 2)
+        __mid_row = time.perf_counter()
         # [2:-2] row
         exp_blocked_key_matrix = torch.cat(
             (blocked_key_matrix[:, :, 1:-3], blocked_key_matrix[:, :, 2:-2],
@@ -612,6 +615,7 @@ class BigbirdBlockSpareAttention(nn.Module):
         context_layer += torch.einsum("bhlqk,bhkd->bhlqd",
                                       attn_weights[:, :, :, :, -wn:],
                                       blocked_value_matrix[:, :, -1])
+        __last_second = time.perf_counter()
         # -2 row
         second_last_key_mat = torch.cat(
             (blocked_key_matrix[:, :, 0], blocked_key_matrix[:, :, -3],
@@ -638,6 +642,7 @@ class BigbirdBlockSpareAttention(nn.Module):
         second_last_context_layer = torch.unsqueeze(second_last_context_layer,
                                                     2)
         # -1 row
+        __last_row = time.perf_counter()
         last_product = torch.einsum("bhqd,bhkd->bhqk",
                                     blocked_query_matrix[:, :, -1], key_layer)
         last_product = torch.mul(last_product, 1.0 / np.sqrt(d))
@@ -651,4 +656,13 @@ class BigbirdBlockSpareAttention(nn.Module):
              second_last_context_layer, last_context_layer), 2)
         context_layer = context_layer.view((b, h, m, -1)) * from_mask
         context_layer = context_layer.permute(0, 2, 1, 3)
+        __end = time.perf_counter()
+        print("init and gen random location ", __gen_rand_mask - __init_and_gen_random_location)
+        print("generate random mask ", __gather_random_data - __gen_rand_mask)
+        print("gather random data ", __first_row - __gather_random_data)
+        print("first row ", __second_row - __first_row)
+        print("second row ", __mid_row - __second_row)
+        print("mid row ", __last_second - __mid_row)
+        print("last second row ", __last_row - __last_second)
+        print("last row ", __end - __last_row)
         return context_layer

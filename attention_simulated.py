@@ -434,10 +434,12 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
        float Tensor of shape [batch_size, from_seq_length, num_attention_heads,
          size_per_head].
      """
+     __start = time.perf_counter()
      attention_mask = masks[0]
  
      # Directly take n^2 dot product between "query" and "key".
      attention_scores = torch.einsum("bnfh,bnth->bnft", query_layer, key_layer)
+     __mask_softmax = time.perf_counter()
      attention_scores = torch.multiply(attention_scores,
                                     1.0 / np.sqrt(float(self.size_per_head)))
  
@@ -458,9 +460,14 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
      # This is actually dropping out entire tokens to attend to, which might
      # seem a bit unusual, but is taken from the original Transformer paper.
      #attention_probs = self.attention_dropout(attention_probs, training=training)
+     __wv = time.perf_counter()
  
      # `context_layer` = [B, F, N, H]
      context_layer = torch.einsum("bnft,bnth->bfnh", attention_probs, value_layer)
+     __end = time.perf_counter()
+     print("q*k ", __mask_softmax - __start)
+     print("mask and softmax", __wv - __mask_softmax)
+     print("w*v ", __end - __wv)
      return context_layer
 
     def forward(self,
@@ -519,6 +526,7 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
           float Tensor of shape [batch_size, from_seq_length, num_attention_heads,
             size_per_head].
         """
+        __init_and_gen_random_position = time.perf_counter()
         assert from_seq_length // self.from_block_size == to_seq_length // self.to_block_size
 
         # generate random attention and corresponding masks
@@ -531,7 +539,7 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
                     self.from_block_size,
                     self.to_block_size,
                     self.num_rand_blocks,
-                    last_idx=1024)[:(
+                    last_idx=from_seq_length)[:(
                         from_seq_length // self.from_block_size - 2)]
                 for _ in range(self.num_attention_heads)
             ]
@@ -540,12 +548,13 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
 
         rand_attn = np.stack(rand_attn, axis=0)
         rand_attn = torch.from_numpy(rand_attn).long()
-
-        rand_block_mask = self.convert_attn_list_to_mask(rand_attn, from_seq_length, to_seq_length)
-        rand_block_mask = torch.unsqueeze(rand_block_mask, 0)  # [1, N, F, T]
-
-        attention_mask = rand_block_mask
+        __generate_full_attention_mask = time.perf_counter() 
+        attention_mask = self.convert_attn_list_to_mask(rand_attn, from_seq_length, to_seq_length)
+        attention_mask = torch.unsqueeze(attention_mask, 0)  # [1, N, F, T]
+        __compute_start = time.perf_counter()
         res =  self.original_full_attention(
             query_layer, key_layer, value_layer, [attention_mask]
             )
+        print("init and generate random attention positions ", __generate_full_attention_mask - __init_and_gen_random_position)
+        print("generate full attention mask ", __compute_start - __generate_full_attention_mask)
         return res
