@@ -520,7 +520,6 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
             size_per_head].
         """
         assert from_seq_length // self.from_block_size == to_seq_length // self.to_block_size
-        perpare_data_start = time.perf_counter()
 
         # generate random attention and corresponding masks
         np.random.seed(self.seed)
@@ -546,8 +545,7 @@ class BigbirdBlockSpareAttention_sim(nn.Module):
         rand_block_mask = torch.unsqueeze(rand_block_mask, 0)  # [1, N, F, T]
 
         attention_mask = rand_block_mask
-        compute_start = time.perf_counter()
         res =  self.original_full_attention(
             query_layer, key_layer, value_layer, [attention_mask]
             )
-        return res, compute_start
+        return res

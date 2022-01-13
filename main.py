@@ -49,7 +49,7 @@ attn = BigbirdBlockSpareAttention(
     from_block_size=from_block_size,
     to_block_size=to_block_size).cuda()
 
-res, compute_start = attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask, from_blocked_mask, to_blocked_mask, batch_size, from_seq_length, to_seq_length)
+res = attn(query_layer, key_layer, value_layer, band_mask, from_mask, to_mask, from_blocked_mask, to_blocked_mask, batch_size, from_seq_length, to_seq_length)
 '''
 attn_sim = BigbirdBlockSpareAttention_sim(
     num_attention_heads=num_attention_heads,
@@ -57,12 +57,8 @@ attn_sim = BigbirdBlockSpareAttention_sim(
     size_per_head=size_per_head,
     from_block_size=from_block_size,
     to_block_size=to_block_size).cuda()
-res, compute_start = attn_sim(query_layer, key_layer, value_layer, batch_size, from_seq_length, to_seq_length)
+res = attn_sim(query_layer, key_layer, value_layer, batch_size, from_seq_length, to_seq_length)
 '''
 end = time.perf_counter()
 
-print(end - start)
-print("%")
-print((end - compute_start)/ (end-start)*100)
-print('throutput')
 print(batch_size*num_attention_heads*from_seq_length/(end - start)/1000)

@@ -529,7 +529,6 @@ class BigbirdBlockSpareAttention(nn.Module):
         gathered_value = utils.torch_gather5d(
             blocked_value_matrix, rand_attn).view((b, h, m // wm - 2, r * wn,
                                                    -1))
-        compute_start = time.perf_counter()
         # first row
         first_product = torch.einsum(
             "bhqd,bhkd->bhqk", blocked_query_matrix[:, :, 0],
@@ -652,4 +651,4 @@ class BigbirdBlockSpareAttention(nn.Module):
              second_last_context_layer, last_context_layer), 2)
         context_layer = context_layer.view((b, h, m, -1)) * from_mask
         context_layer = context_layer.permute(0, 2, 1, 3)
-        return context_layer, compute_start###
+        return context_layer
