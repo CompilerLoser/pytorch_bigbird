@@ -575,6 +575,7 @@ class BigbirdBlockSpareAttention(nn.Module):
              blocked_value_matrix[:, :, 2:-2],
              blocked_value_matrix[:, :, 3:-1]), 3)  # [b, h, m//wm-4, 3*wn, -1]
         middle_query_matrix = blocked_query_matrix[:, :, 2:-2]
+        __expand = time.perf_counter()
         # slide winow band
         inner_band_product = torch.einsum(
             "bhlqd,bhlkd->bhlqk", middle_query_matrix, exp_blocked_key_matrix)
@@ -662,7 +663,8 @@ class BigbirdBlockSpareAttention(nn.Module):
         print("gather random data ", __first_row - __gather_random_data)
         print("first row ", __second_row - __first_row)
         print("second row ", __mid_row - __second_row)
-        print("mid row ", __last_second - __mid_row)
+        print("expand key ", __expand - __mid_row)
+        print("mid row ", __last_second - __expand)
         print("last second row ", __last_row - __last_second)
         print("last row ", __end - __last_row)
         return context_layer

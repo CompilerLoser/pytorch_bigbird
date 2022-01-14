@@ -6,7 +6,7 @@ import torch
 import time
 import os
 
-batch_size = 16
+batch_size = 1
 
 num_attention_heads = 4
 size_per_head = 512
